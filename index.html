@@ -9,9 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="ReDora">
 <meta name="theme-color" content="#000000">
-<meta name="application-name" content="ReDora">
 <link id="manifest-link" rel="manifest">
 <link id="apple-icon" rel="apple-touch-icon">
+<script src="https://accounts.google.com/gsi/client" async></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -207,20 +207,19 @@
       <div class="cbox">
         <div class="clogo"><span class="R">R</span>e<span class="D">D</span>ora</div>
         <div style="height:20px"></div>
-        <div class="cbadge"><div class="cdot"></div><span id="clabel">Drive connected</span></div>
+        <div class="cbadge"><div class="cdot"></div><span id="clabel">Google Drive connected</span></div>
+        <div id="cuserinfo" style="font-size:13px;color:#666;margin-bottom:18px;padding-left:2px"></div>
         <button class="btn-p" onclick="goTo('home')">Open →</button>
-        <button class="btn-g" onclick="disconnectDrive()">Disconnect</button>
+        <button class="btn-g" onclick="disconnectDrive()">Sign out</button>
       </div>
     </div>
     <div id="cnew" style="width:100%;padding:40px 24px">
       <div class="cbox">
         <div class="clogo"><span class="R">R</span>e<span class="D">D</span>ora</div>
         <div style="height:6px"></div>
-        <div class="cdesc">Enter your name to get started. Your memories will sync via Google Drive automatically.</div>
-        <label class="flabel">Your Name</label>
-        <input class="finput" type="text" id="nameIn" placeholder="e.g. Lazin" />
-        <button class="btn-p" onclick="connectDrive()">Start ReDora</button>
-        <button class="btn-g" onclick="skipConnect()">Skip</button>
+        <div class="cdesc">Sign in with your Google account. Your memories back up to your own Drive — no one else can see them.</div>
+        <button class="btn-p" id="googleSignInBtn" onclick="signInWithGoogle()">Sign in with Google</button>
+        <button class="btn-g" onclick="skipConnect()" style="margin-top:10px">Skip — save locally only</button>
       </div>
     </div>
   </div>
@@ -364,23 +363,13 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbya1Q3KvdjtYNTxWtA3rgXJqcf6nzLkX6C70yRdV0viSt7D7pz07Jw2C0seCMwVXUDI/exec";
-
-function driveImg(src){
-  if(!src) return '';
-  if(src.startsWith('data:')) return src;
-  let id=null;
-  const m1=src.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-  const m2=src.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
-  const m3=src.match(/^([a-zA-Z0-9_-]{25,})$/);
-  if(m1) id=m1[1]; else if(m2) id=m2[1]; else if(m3) id=m3[1];
-  if(id) return 'https://drive.google.com/thumbnail?id='+id+'&sz=w800';
-  return src;
-}
+// ── REPLACE THIS WITH YOUR GOOGLE CLOUD CLIENT ID ──────────────────────────
+const CLIENT_ID = '630049844572-k7hh6fc5j52fa0826lumthtf4ouf18n1.apps.googleusercontent.com';
+// ───────────────────────────────────────────────────────────────────────────
 
 const S = {
   posts:   JSON.parse(localStorage.getItem('rd2_posts')   || '[]'),
-  profile: JSON.parse(localStorage.getItem('rd2_profile') || JSON.stringify({name:'Your Name',bio:'',photo:null})),
+  profile: JSON.parse(localStorage.getItem('rd2_profile') || JSON.stringify({name:'Your Name',bio:'',photo:null,email:null})),
   drive:   JSON.parse(localStorage.getItem('rd2_drive')   || 'null'),
   pendImg: null,
   pendDel: null,
@@ -391,66 +380,176 @@ const save = () => {
   localStorage.setItem('rd2_drive',   JSON.stringify(S.drive));
 };
 
-// SPLASH
-window.addEventListener('load', () => setTimeout(() => { goSc('connect'); showConnect(); }, 2000));
+let tokenClient = null;
+let accessToken  = null;
 
-// NAV
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+function initGoogleAuth(){
+  if(typeof google === 'undefined'){ setTimeout(initGoogleAuth, 500); return; }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    callback: handleToken
+  });
+}
+
+async function handleToken(resp){
+  if(resp.error){ showToast('Sign in failed — try again'); return; }
+  accessToken = resp.access_token;
+  showLoad('Connecting to Drive...');
+  try{
+    const ui = await gFetch('https://www.googleapis.com/oauth2/v2/userinfo');
+    S.profile.name  = ui.name  || 'Me';
+    S.profile.email = ui.email || '';
+    S.profile.photo = ui.picture || null;
+    await ensureFolder();
+    S.drive = {ok:true, folderId: S.drive ? S.drive.folderId : null};
+    save(); hideLoad(); showConnect();
+    showToast('Connected as ' + S.profile.name);
+    setTimeout(() => goTo('home'), 700);
+  } catch(e){
+    hideLoad(); showToast('Could not connect — check your Client ID');
+  }
+}
+
+function signInWithGoogle(){
+  if(!tokenClient){ showToast('Still loading — try again in a second'); return; }
+  tokenClient.requestAccessToken({prompt:'consent'});
+}
+
+function silentRefresh(){
+  if(!tokenClient || !S.drive || !S.drive.ok) return;
+  tokenClient.requestAccessToken({prompt:''});
+}
+
+function disconnectDrive(){
+  if(accessToken && typeof google !== 'undefined') google.accounts.oauth2.revoke(accessToken, ()=>{});
+  accessToken = null; S.drive = null; S.posts = []; save();
+  showConnect(); showToast('Signed out');
+}
+
+// ── DRIVE API ─────────────────────────────────────────────────────────────────
+async function gFetch(url, opts={}){
+  const r = await fetch(url, {
+    ...opts,
+    headers: { Authorization: 'Bearer ' + accessToken, ...(opts.headers||{}) }
+  });
+  if(r.status === 401){ accessToken = null; silentRefresh(); throw new Error('401'); }
+  if(r.status === 204) return {};
+  if(!r.ok) throw new Error('Drive error ' + r.status);
+  return r.json();
+}
+
+async function ensureFolder(){
+  if(S.drive && S.drive.folderId) return S.drive.folderId;
+  const q = encodeURIComponent("name='ReDora' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const list = await gFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)');
+  if(list.files && list.files.length){
+    if(!S.drive) S.drive={ok:true};
+    S.drive.folderId = list.files[0].id; save(); return S.drive.folderId;
+  }
+  const folder = await gFetch('https://www.googleapis.com/drive/v3/files',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name:'ReDora', mimeType:'application/vnd.google-apps.folder'})
+  });
+  if(!S.drive) S.drive={ok:true};
+  S.drive.folderId = folder.id; save(); return folder.id;
+}
+
+async function uploadToDrive(base64Data, caption){
+  const folderId = await ensureFolder();
+  const mimeType = base64Data.split(';')[0].split(':')[1] || 'image/jpeg';
+  const raw = atob(base64Data.split(',')[1]);
+  const arr = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  const blob = new Blob([arr],{type:mimeType});
+  const meta = {name:'memory_'+Date.now()+'.jpg', description:caption||'', parents:[folderId]};
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
+  form.append('file', blob);
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,description,createdTime',{
+    method:'POST', headers:{Authorization:'Bearer '+accessToken}, body:form
+  });
+  return r.json();
+}
+
+async function listFromDrive(){
+  if(!accessToken || !S.drive || !S.drive.folderId) return null;
+  const q = encodeURIComponent("'"+S.drive.folderId+"' in parents and mimeType contains 'image/' and trashed=false");
+  return gFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,description,createdTime)&orderBy=createdTime+desc');
+}
+
+async function deleteFromDrive(id){
+  if(!accessToken) return;
+  await fetch('https://www.googleapis.com/drive/v3/files/'+id,{
+    method:'DELETE', headers:{Authorization:'Bearer '+accessToken}
+  });
+}
+
+function driveImg(src){
+  if(!src) return '';
+  if(src.startsWith('data:')) return src;
+  let id=null;
+  const m1=src.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  const m2=src.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  const m3=(!src.startsWith('http')) && src.match(/^([a-zA-Z0-9_-]{10,})$/);
+  if(m1) id=m1[1]; else if(m2) id=m2[1]; else if(m3) id=m3[0];
+  if(id) return 'https://drive.google.com/thumbnail?id='+id+'&sz=w800';
+  return src;
+}
+
+// ── SPLASH + CONNECT ──────────────────────────────────────────────────────────
+window.addEventListener('load', ()=>{
+  setTimeout(()=>{ goSc('connect'); showConnect(); }, 1800);
+  setTimeout(initGoogleAuth, 800);
+});
+
+function showConnect(){
+  const done=document.getElementById('cdone'), cnew=document.getElementById('cnew');
+  if(S.drive && S.drive.ok){
+    done.style.display='block'; cnew.style.display='none';
+    document.getElementById('clabel').textContent=(S.profile.name||'You')+' — Drive connected';
+    document.getElementById('cuserinfo').textContent=S.profile.email||'';
+  } else {
+    done.style.display='none'; cnew.style.display='block';
+  }
+}
+
+function skipConnect(){
+  S.drive={ok:false, folderId:null}; save(); goTo('home');
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
 function goSc(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 function goTo(id){
   goSc(id);
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const n=document.getElementById('nav-'+id); if(n) n.classList.add('active');
-  if(id==='home'){ renderFeed(); syncDrive(); }
+  if(id==='home'){ renderFeed(); if(accessToken) syncDrive(); }
   if(id==='profile') renderProfile();
 }
 
-// CONNECT
-function showConnect(){
-  if(S.drive && S.drive.ok){
-    document.getElementById('cdone').style.display='block';
-    document.getElementById('cnew').style.display='none';
-    document.getElementById('clabel').textContent=(S.drive.name||'Drive')+' — connected';
-  } else {
-    document.getElementById('cdone').style.display='none';
-    document.getElementById('cnew').style.display='block';
-    if(S.profile.name && S.profile.name!=='Your Name')
-      document.getElementById('nameIn').value=S.profile.name;
-  }
-}
-async function connectDrive(){
-  const name=(document.getElementById('nameIn').value.trim())||'Me';
-  const btn=document.querySelector('#cnew .btn-p');
-  btn.textContent='Connecting...'; btn.disabled=true;
-  try{
-    const res=await fetch(SCRIPT_URL);
-    const data=await res.json();
-    S.drive={scriptUrl:SCRIPT_URL,name,ok:true};
-    S.profile.name=name;
-    if(data.posts && data.posts.length) S.posts=data.posts;
-    save(); showToast('Connected to Drive');
-    setTimeout(()=>goTo('home'),600);
-  } catch(e){
-    showToast('Could not connect — check your URL');
-    btn.textContent='Start ReDora'; btn.disabled=false;
-  }
-}
-function skipConnect(){
-  S.drive={scriptUrl:SCRIPT_URL,name:S.profile.name||'Me',ok:true};
-  save(); goTo('home');
-}
-function disconnectDrive(){ S.drive=null; save(); showConnect(); showToast('Disconnected'); }
-
-// SYNC
+// ── SYNC ──────────────────────────────────────────────────────────────────────
 async function syncDrive(){
+  if(!accessToken) return;
   try{
-    const r=await fetch(SCRIPT_URL);
-    const d=await r.json();
-    if(d.posts){ S.posts=d.posts; save(); renderFeed(); }
+    const data = await listFromDrive(); if(!data||!data.files) return;
+    const liked={};
+    S.posts.forEach(p=>{ if(p.liked) liked[p.id]={liked:true,likes:p.likes||0}; });
+    S.posts = data.files.map(f=>({
+      id:f.id, img:f.id, caption:f.description||'',
+      ts:new Date(f.createdTime).getTime(),
+      liked:!!(liked[f.id]&&liked[f.id].liked),
+      likes:liked[f.id]?liked[f.id].likes:0,
+      isDrive:true
+    }));
+    save(); renderFeed();
   } catch(e){}
 }
+
 async function refreshFromDrive(){ showLoad('Syncing...'); await syncDrive(); hideLoad(); showToast('Synced'); }
 
-// FEED
+// ── FEED ──────────────────────────────────────────────────────────────────────
 function renderFeed(){
   const pc=document.getElementById('posts'), ef=document.getElementById('efeed');
   const sb=document.getElementById('sbar');
@@ -458,8 +557,7 @@ function renderFeed(){
   if(!S.posts.length){ ef.style.display='flex'; pc.innerHTML=''; return; }
   ef.style.display='none';
   [...S.posts].slice(0,6).forEach(p=>{
-    const el=document.createElement('div');
-    el.className='si dstory';
+    const el=document.createElement('div'); el.className='si dstory';
     el.innerHTML=`<div class="sr"><img src="${driveImg(p.img)}" alt=""></div><span class="slbl">${ago(p.ts)}</span>`;
     el.onclick=()=>openPost(p.id); sb.appendChild(el);
   });
@@ -468,15 +566,15 @@ function renderFeed(){
       <div class="ph">
         <div class="pav">${S.profile.photo?`<img src="${S.profile.photo}" alt="">`:'◻'}</div>
         <div><div class="puser">${esc(S.profile.name)}</div><div class="ptime">${ago(p.ts)}</div></div>
-        <div class="pmore" onclick="askDel(${p.id})">···</div>
+        <div class="pmore" onclick="askDel(${JSON.stringify(p.id)})">···</div>
       </div>
-      <div class="pimg" onclick="openPost(${p.id})"><img src="${driveImg(p.img)}" alt="" loading="lazy"></div>
+      <div class="pimg" onclick="openPost(${JSON.stringify(p.id)})"><img src="${driveImg(p.img)}" alt="" loading="lazy"></div>
       <div class="pacts">
-        <button class="abtn ${p.liked?'liked':''}" onclick="like(${p.id},this)">
+        <button class="abtn ${p.liked?'liked':''}" onclick="like(${JSON.stringify(p.id)},this)">
           <svg width="17" height="17" fill="${p.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span>${p.likes||0}</span>
         </button>
-        <button class="abtn" onclick="openPost(${p.id})">
+        <button class="abtn" onclick="openPost(${JSON.stringify(p.id)})">
           <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </button>
       </div>
@@ -495,11 +593,11 @@ function like(id,btn){
 function askDel(id){ S.pendDel=id; openM('delModal'); }
 async function confirmDel(){
   const id=S.pendDel; closeM('delModal'); showLoad('Deleting...');
-  try{ await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'deletePost',id:String(id)})}); } catch(e){}
+  try{ await deleteFromDrive(id); } catch(e){}
   S.posts=S.posts.filter(p=>p.id!=id); save(); hideLoad(); renderFeed(); showToast('Deleted');
 }
 
-// UPLOAD
+// ── UPLOAD ────────────────────────────────────────────────────────────────────
 function handleFile(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
@@ -509,7 +607,7 @@ function handleFile(e){
     z.classList.add('has-img');
     z.innerHTML=`<img src="${ev.target.result}" alt=""><button class="uchg" onclick="resetUp(event)">Change</button>`;
     document.getElementById('shareBtn').disabled=false;
-    if(S.drive){ document.getElementById('dind').classList.add('show'); document.getElementById('dindlbl').textContent='Will sync to Drive · '+(S.drive.name||''); }
+    if(S.drive&&S.drive.ok&&accessToken){ document.getElementById('dind').classList.add('show'); document.getElementById('dindlbl').textContent='Will sync to your Drive'; }
   };
   r.readAsDataURL(f);
 }
@@ -525,14 +623,22 @@ async function submitPost(){
   btn.disabled=true; btn.textContent='Saving...'; pb.classList.add('show');
   let prog=0; const iv=setInterval(()=>{ prog+=Math.random()*18; if(prog>=88){prog=88;clearInterval(iv);} pf.style.width=prog+'%'; },200);
   try{
-    const res=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'uploadPhoto',image:S.pendImg,mimeType:'image/jpeg',fileName:'memory_'+Date.now()+'.jpg',caption:cap,userName:S.profile.name||'Me'})});
-    const d=await res.json();
-    clearInterval(iv); pf.style.width='100%';
-    if(d.success && d.post){ S.posts.unshift(d.post); save(); showToast('Saved to Drive'); }
-    else throw new Error(d.error);
+    if(accessToken && S.drive && S.drive.ok){
+      const file = await uploadToDrive(S.pendImg, cap);
+      clearInterval(iv); pf.style.width='100%';
+      if(file && file.id){
+        S.posts.unshift({id:file.id, img:file.id, caption:cap, ts:Date.now(), liked:false, likes:0, isDrive:true});
+        save(); showToast('Saved to your Drive');
+      }
+    } else {
+      clearInterval(iv); pf.style.width='100%';
+      S.posts.unshift({id:Date.now(), img:S.pendImg, caption:cap, ts:Date.now(), liked:false, likes:0});
+      save(); showToast('Saved locally');
+    }
   } catch(err){
     clearInterval(iv); pf.style.width='100%';
-    S.posts.unshift({id:Date.now(),img:S.pendImg,caption:cap,ts:Date.now(),liked:false,likes:0}); save(); showToast('Saved locally');
+    S.posts.unshift({id:Date.now(), img:S.pendImg, caption:cap, ts:Date.now(), liked:false, likes:0});
+    save(); showToast('Saved locally');
   }
   await new Promise(r=>setTimeout(r,350)); pb.classList.remove('show'); pf.style.width='0%';
   resetUp(); document.getElementById('capIn').value='';
@@ -540,7 +646,7 @@ async function submitPost(){
   setTimeout(()=>goTo('home'),400);
 }
 
-// PROFILE
+// ── PROFILE ───────────────────────────────────────────────────────────────────
 function renderProfile(){
   const p=S.profile;
   document.getElementById('pname').textContent=p.name||'Your Name';
@@ -548,14 +654,14 @@ function renderProfile(){
   document.getElementById('pbio').textContent=p.bio||'—';
   document.getElementById('pcnt').textContent=S.posts.length+' memor'+(S.posts.length===1?'y':'ies');
   const dl=document.getElementById('pdlbl');
-  dl.innerHTML=S.drive&&S.drive.ok?`<div class="pddot"></div> Drive connected · ${S.drive.name||''}`:'No drive connected';
+  dl.innerHTML=S.drive&&S.drive.ok?`<div class="pddot"></div> Drive connected · ${S.profile.email||S.profile.name||''}`:'No drive connected';
   const av=document.getElementById('pava');
   av.innerHTML=p.photo?`<img src="${p.photo}" alt="">`:'◻';
   const gr=document.getElementById('pgrid'), pe=document.getElementById('pempty');
   if(!S.posts.length){ gr.innerHTML=''; pe.style.display='flex'; return; }
   pe.style.display='none';
   gr.innerHTML=[...S.posts].sort((a,b)=>b.ts-a.ts).map(p=>`
-    <div class="gitem" onclick="openPost(${p.id})">
+    <div class="gitem" onclick="openPost(${JSON.stringify(p.id)})">
       <img src="${driveImg(p.img)}" alt="" loading="lazy">
       <div class="gov"><svg width="18" height="18" fill="none" stroke="white" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
     </div>`).join('');
@@ -565,10 +671,10 @@ function handleAvatar(e){ const f=e.target.files[0]; if(!f) return; const r=new 
 function openEdit(){ document.getElementById('eName').value=S.profile.name||''; document.getElementById('eBio').value=S.profile.bio||''; openM('editM'); }
 function saveProfile(){ const n=document.getElementById('eName').value.trim(); if(!n){showToast('Name required');return;} S.profile.name=n; S.profile.bio=document.getElementById('eBio').value.trim(); save(); renderProfile(); closeM('editM'); showToast('Profile updated'); }
 
-// POST MODAL
+// ── POST MODAL ────────────────────────────────────────────────────────────────
 function openPost(id){ const p=S.posts.find(x=>x.id==id); if(!p) return; document.getElementById('mimg').src=driveImg(p.img); document.getElementById('mname').textContent=S.profile.name; document.getElementById('mcap').textContent=p.caption||''; document.getElementById('mdate').textContent=fmt(p.ts); openM('postModal'); }
 
-// UTILS
+// ── UTILS ─────────────────────────────────────────────────────────────────────
 function openM(id){ document.getElementById(id).classList.add('show'); }
 function closeM(id){ document.getElementById(id).classList.remove('show'); }
 function showLoad(t){ document.getElementById('ltxt').textContent=t||'Loading'; document.getElementById('lover').classList.add('show'); }
@@ -577,55 +683,21 @@ let _tt; function showToast(m){ const t=document.getElementById('toast'); t.text
 function fmt(ts){ return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
 function ago(ts){ const d=Date.now()-ts; if(d<60000)return'just now'; if(d<3600000)return Math.floor(d/60000)+'m ago'; if(d<86400000)return Math.floor(d/3600000)+'h ago'; return Math.floor(d/86400000)+'d ago'; }
 function esc(s){ return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-</script>
-<script>
+
+// ── PWA INSTALL ───────────────────────────────────────────────────────────────
 (function(){
-  const c=document.createElement('canvas');
-  c.width=512; c.height=512;
+  const c=document.createElement('canvas'); c.width=512; c.height=512;
   const x=c.getContext('2d');
-  x.fillStyle='#000000';
-  x.fillRect(0,0,512,512);
-  x.fillStyle='#ffffff';
-  x.font='italic 900 340px Georgia,serif';
-  x.textAlign='center';
-  x.textBaseline='middle';
-  x.fillText('R',256,270);
+  x.fillStyle='#000'; x.fillRect(0,0,512,512);
+  x.fillStyle='#fff'; x.font='italic 900 340px Georgia,serif';
+  x.textAlign='center'; x.textBaseline='middle'; x.fillText('R',256,270);
   const icon=c.toDataURL('image/png');
   document.getElementById('apple-icon').href=icon;
-  const manifest={
-    name:'ReDora',
-    short_name:'ReDora',
-    description:'Memories, kept',
-    start_url:'./',
-    scope:'./',
-    display:'standalone',
-    orientation:'portrait',
-    background_color:'#000000',
-    theme_color:'#000000',
-    icons:[
-      {src:icon,sizes:'512x512',type:'image/png',purpose:'any maskable'},
-      {src:icon,sizes:'192x192',type:'image/png',purpose:'any maskable'}
-    ]
-  };
+  const manifest={name:'ReDora',short_name:'ReDora',description:'Memories, kept',start_url:'./',scope:'./',display:'standalone',orientation:'portrait',background_color:'#000000',theme_color:'#000000',icons:[{src:icon,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
   const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
   document.getElementById('manifest-link').href=URL.createObjectURL(blob);
   if('serviceWorker' in navigator){
-    const sw=`
-      const CACHE='redora-v1';
-      self.addEventListener('install',e=>{self.skipWaiting();});
-      self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});
-      self.addEventListener('fetch',e=>{
-        if(e.request.method!=='GET') return;
-        e.respondWith(
-          caches.open(CACHE).then(cache=>
-            cache.match(e.request).then(hit=>{
-              const fresh=fetch(e.request).then(r=>{cache.put(e.request,r.clone());return r;}).catch(()=>hit);
-              return hit||fresh;
-            })
-          )
-        );
-      });
-    `;
+    const sw=`const C='rd-v1';self.addEventListener('install',e=>{self.skipWaiting();});self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.open(C).then(cache=>cache.match(e.request).then(hit=>{const fresh=fetch(e.request).then(r=>{cache.put(e.request,r.clone());return r;}).catch(()=>hit);return hit||fresh;})));});`;
     const swBlob=new Blob([sw],{type:'application/javascript'});
     navigator.serviceWorker.register(URL.createObjectURL(swBlob),{scope:'./'}).catch(()=>{});
   }
