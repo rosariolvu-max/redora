@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ReDora</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="ReDora">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%23000'/><text x='90' y='130' font-size='110' text-anchor='middle' fill='white' font-family='Georgia,serif' font-style='italic' font-weight='900'>R</text></svg>">
+<link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;ReDora&quot;,&quot;short_name&quot;:&quot;ReDora&quot;,&quot;description&quot;:&quot;Memories, kept&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%23000000&quot;,&quot;theme_color&quot;:&quot;%23000000&quot;,&quot;orientation&quot;:&quot;portrait&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23000'/><text x='256' y='380' font-size='320' text-anchor='middle' fill='white' font-family='Georgia,serif' font-style='italic' font-weight='900'>R</text></svg>&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0e0e0e; --surface:#181818; --surface2:#222;
+    --border:#2e2e2e; --border2:#3a3a3a;
+    --text:#f5f5f5; --soft:#b0b0b0; --muted:#666;
+    --white:#fff; --black:#000;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:var(--black);display:flex;justify-content:center;min-height:100vh;font-family:'DM Sans',sans-serif;color:var(--text)}
+  .phone{width:100%;max-width:430px;min-height:100vh;background:var(--bg);position:relative;overflow:hidden}
+  .screen{display:none;flex-direction:column;min-height:100vh}
+  .screen.active{display:flex}
+  ::-webkit-scrollbar{width:0}
+
+  /* SPLASH */
+  #splash{background:#000;justify-content:center;align-items:center}
+  .splash-inner{text-align:center;animation:sIn 1.1s cubic-bezier(.16,1,.3,1) both}
+  @keyframes sIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+  .splash-logo{font-family:'Playfair Display',serif;font-size:80px;font-weight:900;letter-spacing:-3px;color:#fff;line-height:1}
+  .splash-logo .R{font-style:italic;border-bottom:3px solid #fff;padding-bottom:2px}
+  .splash-logo .D{position:relative;display:inline-block}
+  .splash-logo .D::after{content:'';position:absolute;top:10px;right:-7px;width:7px;height:7px;background:#fff;border-radius:50%}
+  .splash-tag{font-size:11px;letter-spacing:5px;text-transform:uppercase;color:#444;margin-top:20px}
+  .splash-line{width:1px;height:44px;background:#222;margin:22px auto 0;animation:lG 1s .8s ease both;transform-origin:top}
+  @keyframes lG{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+  /* CONNECT */
+  #connect{justify-content:center;align-items:center;padding:40px 24px;background:var(--bg)}
+  .cbox{width:100%;border:1px solid var(--border);padding:36px 28px;position:relative}
+  .cbox::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--white)}
+  .clogo{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;letter-spacing:-1px;margin-bottom:6px}
+  .clogo .R{font-style:italic}
+  .cdesc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:24px;border-left:2px solid var(--border2);padding-left:12px}
+  .flabel{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block}
+  .finput{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border2);padding:10px 0;color:var(--text);font-size:14px;outline:none;font-family:'DM Sans',sans-serif;margin-bottom:22px;transition:border-color .2s}
+  .finput:focus{border-bottom-color:var(--white)}
+  .finput::placeholder{color:var(--muted)}
+  .btn-p{width:100%;padding:15px;background:var(--white);border:none;color:var(--black);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:opacity .2s;font-family:'DM Sans',sans-serif}
+  .btn-p:hover{opacity:.88}
+  .btn-p:disabled{opacity:.3;cursor:not-allowed}
+  .btn-g{width:100%;padding:13px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:10px;transition:border-color .2s,color .2s;font-family:'DM Sans',sans-serif}
+  .btn-g:hover{border-color:var(--border2);color:var(--soft)}
+  .cbadge{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);padding:12px 14px;font-size:13px;color:var(--soft);margin-bottom:18px}
+  .cdot{width:7px;height:7px;border-radius:50%;background:var(--white);flex-shrink:0}
+
+  /* HEADER */
+  .hdr{background:var(--bg);border-bottom:1px solid var(--border);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .hlogo{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;letter-spacing:-1px;color:var(--white)}
+  .hlogo .R{font-style:italic}
+  .hacts{display:flex;gap:8px}
+  .ibtn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:color .2s}
+  .ibtn:hover{color:var(--white)}
+
+  /* BOTTOM NAV */
+  .bnav{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);display:flex;padding:8px 0 22px;z-index:100}
+  .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:5px 0}
+  .ni-icon{width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:color .2s}
+  .ni.active .ni-icon{color:var(--white)}
+  .ni-lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+  .ni.active .ni-lbl{color:var(--white)}
+  .add-circle{width:44px;height:44px;background:var(--white);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--black);transition:transform .15s}
+  .ni:hover .add-circle{transform:scale(1.08)}
+
+  /* FEED */
+  .feed{flex:1;overflow-y:auto}
+  .sbar{display:flex;gap:14px;padding:13px 14px;overflow-x:auto;border-bottom:1px solid var(--border)}
+  .si{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;flex-shrink:0}
+  .sr{width:56px;height:56px;border-radius:50%;border:1px solid var(--border2);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--surface);transition:border-color .2s;font-size:20px;color:var(--muted)}
+  .si:hover .sr{border-color:var(--white)}
+  .sr img{width:100%;height:100%;object-fit:cover;display:block}
+  .slbl{font-size:10px;color:var(--muted);letter-spacing:.5px;white-space:nowrap}
+  .post{border-bottom:1px solid var(--border);animation:fU .35s ease both}
+  @keyframes fU{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .ph{display:flex;align-items:center;padding:11px 13px 9px;gap:10px}
+  .pav{width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted)}
+  .pav img{width:100%;height:100%;object-fit:cover;display:block}
+  .puser{font-size:13px;font-weight:600}
+  .ptime{font-size:11px;color:var(--muted);margin-top:1px}
+  .pmore{margin-left:auto;color:var(--muted);cursor:pointer;font-size:18px;padding:4px;transition:color .2s;line-height:1}
+  .pmore:hover{color:var(--white)}
+  .pimg{width:100%;aspect-ratio:1;overflow:hidden;background:var(--surface);cursor:pointer}
+  .pimg img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
+  .pimg:hover img{transform:scale(1.02)}
+  .pacts{display:flex;gap:2px;padding:9px 11px 5px}
+  .abtn{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 8px;display:flex;align-items:center;gap:5px;font-size:13px;transition:color .2s;font-family:'DM Sans',sans-serif}
+  .abtn:hover{color:var(--white)}
+  .abtn.liked{color:var(--white)}
+  .pcap{padding:2px 13px 5px;font-size:13px;line-height:1.55;color:var(--soft)}
+  .pcap b{color:var(--white);font-weight:600}
+  .pdate{padding:0 13px 13px;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 30px;gap:12px;text-align:center;flex:1}
+  .eicon{width:60px;height:60px;border:1px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--muted);margin-bottom:4px}
+  .etitle{font-size:15px;font-weight:600;color:var(--soft)}
+  .edesc{font-size:13px;color:var(--muted);line-height:1.6}
+
+  /* PROFILE */
+  .prow{display:flex;align-items:center;gap:18px;padding:22px 18px 14px}
+  .pavw{position:relative;cursor:pointer;flex-shrink:0}
+  .pava{width:84px;height:84px;border-radius:50%;border:1px solid var(--border2);background:var(--surface);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--muted)}
+  .pava img{width:100%;height:100%;object-fit:cover;display:block}
+  .av-ed{position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--white);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;border:2px solid var(--bg)}
+  .pinf{flex:1;min-width:0}
+  .pname{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--white);margin-bottom:3px}
+  .pcount{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .pdlbl{font-size:11px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:5px}
+  .pddot{width:5px;height:5px;border-radius:50%;background:var(--white)}
+  .pbio{padding:0 18px 14px;font-size:13px;color:var(--soft);line-height:1.6}
+  .pedit{margin:0 18px 14px;padding:11px;background:transparent;border:1px solid var(--border2);color:var(--soft);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;width:calc(100% - 36px);transition:border-color .2s,color .2s;font-family:'DM Sans',sans-serif}
+  .pedit:hover{border-color:var(--white);color:var(--white)}
+  .gtabs{display:flex;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .gtab{flex:1;padding:12px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:color .2s,border-color .2s}
+  .gtab.active{color:var(--white);border-bottom-color:var(--white)}
+  .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+  .gitem{aspect-ratio:1;overflow:hidden;background:var(--surface);cursor:pointer;position:relative}
+  .gitem img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+  .gitem:hover img{transform:scale(1.04)}
+  .gov{position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .2s;display:flex;align-items:center;justify-content:center}
+  .gitem:hover .gov{background:rgba(0,0,0,.45)}
+
+  /* UPLOAD */
+  .ubody{flex:1;overflow-y:auto;padding:20px 18px;display:flex;flex-direction:column;gap:16px}
+  .utitle{font-family:'Playfair Display',serif;font-size:22px;font-weight:700}
+  .uzone{border:1px dashed var(--border2);aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:border-color .2s;position:relative;overflow:hidden;background:var(--surface)}
+  .uzone:hover{border-color:var(--white)}
+  .uzone.has-img{border-style:solid;border-color:var(--border2)}
+  .uzone img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .uzone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .uzone-ico{font-size:34px;color:var(--muted);position:relative;z-index:1}
+  .uzone-hint{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;z-index:1}
+  .uchg{position:absolute;bottom:10px;right:10px;z-index:2;background:rgba(0,0,0,.75);color:var(--white);border:none;padding:5px 11px;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif}
+  .ulabel{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block}
+  .ucap{width:100%;min-height:80px;background:transparent;border:none;border-bottom:1px solid var(--border2);padding:10px 0;color:var(--text);font-size:14px;resize:none;outline:none;line-height:1.6;transition:border-color .2s;font-family:'DM Sans',sans-serif}
+  .ucap:focus{border-bottom-color:var(--white)}
+  .ucap::placeholder{color:var(--muted)}
+  .dind{display:none;align-items:center;gap:7px;font-size:12px;color:var(--muted);letter-spacing:.5px;padding:8px 0;border-top:1px solid var(--border)}
+  .dind.show{display:flex}
+  .ddot{width:5px;height:5px;border-radius:50%;background:var(--white)}
+  .pbar{width:100%;height:1px;background:var(--border);display:none}
+  .pbar.show{display:block}
+  .pfill{height:100%;width:0%;background:var(--white);transition:width .4s ease}
+  .bshare{width:100%;padding:15px;background:var(--white);border:none;color:var(--black);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s;font-family:'DM Sans',sans-serif}
+  .bshare:hover{opacity:.88}
+  .bshare:disabled{opacity:.3;cursor:not-allowed}
+
+  /* MODALS */
+  .mover{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+  .mover.show{opacity:1;pointer-events:all}
+  .modal{background:var(--surface);border:1px solid var(--border2);width:100%;max-width:380px;padding:28px 24px;transform:translateY(14px);transition:transform .2s;position:relative}
+  .mover.show .modal{transform:translateY(0)}
+  .mtitle{font-size:18px;font-weight:700;margin-bottom:5px}
+  .mdesc{font-size:13px;color:var(--muted);margin-bottom:20px}
+  .mclose{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+  .minput{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border2);padding:10px 0;color:var(--text);font-size:14px;outline:none;margin-bottom:18px;font-family:'DM Sans',sans-serif;transition:border-color .2s}
+  .minput:focus{border-bottom-color:var(--white)}
+  .minput::placeholder{color:var(--muted)}
+  .mbtn{width:100%;padding:14px;background:var(--white);border:none;color:var(--black);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif}
+  #postModal .modal{padding:0;overflow:hidden;max-width:430px}
+  #postModal .mimg{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+  #postModal .mcap{padding:13px 15px}
+  #postModal .mcname{font-weight:700;font-size:14px}
+  #postModal .mctxt{font-size:13px;color:var(--soft);margin-top:4px;line-height:1.5}
+  #postModal .mcdate{font-size:10px;color:var(--muted);margin-top:7px;letter-spacing:1px;text-transform:uppercase}
+  #postModal .mclose{top:10px;right:10px;color:var(--white);text-shadow:0 1px 4px rgba(0,0,0,.9)}
+  #delModal .modal{max-width:320px}
+  .bdel{width:100%;padding:13px;background:transparent;border:1px solid #f44;color:#f44;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-bottom:8px;font-family:'DM Sans',sans-serif;transition:background .2s,color .2s}
+  .bdel:hover{background:#f44;color:#fff}
+  .bcan{width:100%;padding:12px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif}
+  .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(6px);background:var(--white);color:var(--black);padding:10px 18px;font-size:13px;font-weight:600;letter-spacing:.5px;z-index:300;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .lover{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+  .lover.show{opacity:1;pointer-events:all}
+  .lspin{width:32px;height:32px;border:1px solid var(--border2);border-top-color:var(--white);border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .ltxt{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- SPLASH -->
+  <div class="screen active" id="splash">
+    <div class="splash-inner">
+      <div class="splash-logo"><span class="R">R</span>e<span class="D">D</span>ora</div>
+      <div class="splash-tag">memories, kept</div>
+      <div class="splash-line"></div>
+    </div>
+  </div>
+
+  <!-- CONNECT -->
+  <div class="screen" id="connect">
+    <div id="cdone" style="display:none;width:100%;padding:40px 24px">
+      <div class="cbox">
+        <div class="clogo"><span class="R">R</span>e<span class="D">D</span>ora</div>
+        <div style="height:20px"></div>
+        <div class="cbadge"><div class="cdot"></div><span id="clabel">Drive connected</span></div>
+        <button class="btn-p" onclick="goTo('home')">Open →</button>
+        <button class="btn-g" onclick="disconnectDrive()">Disconnect</button>
+      </div>
+    </div>
+    <div id="cnew" style="width:100%;padding:40px 24px">
+      <div class="cbox">
+        <div class="clogo"><span class="R">R</span>e<span class="D">D</span>ora</div>
+        <div style="height:6px"></div>
+        <div class="cdesc">Enter your name to get started. Your memories will sync via Google Drive automatically.</div>
+        <label class="flabel">Your Name</label>
+        <input class="finput" type="text" id="nameIn" placeholder="e.g. Lazin" />
+        <button class="btn-p" onclick="connectDrive()">Start ReDora</button>
+        <button class="btn-g" onclick="skipConnect()">Skip</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <div class="screen" id="home">
+    <div class="hdr">
+      <div class="hlogo"><span class="R">R</span>e<span class="D">D</span>ora</div>
+      <div class="hacts">
+        <div class="ibtn" onclick="refreshFromDrive()" title="Sync">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </div>
+        <div class="ibtn" onclick="showToast('No new notifications')">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="feed">
+      <div class="sbar" id="sbar">
+        <div class="si" onclick="goTo('upload')">
+          <div class="sr">＋</div>
+          <span class="slbl">New</span>
+        </div>
+      </div>
+      <div id="posts"></div>
+      <div class="empty" id="efeed">
+        <div class="eicon">◻</div>
+        <div class="etitle">No memories yet</div>
+        <div class="edesc">Tap + to add your first memory.</div>
+      </div>
+    </div>
+    <div class="bnav">
+      <div class="ni active" id="nav-home" onclick="goTo('home')">
+        <div class="ni-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <span class="ni-lbl">Home</span>
+      </div>
+      <div class="ni" id="nav-upload" onclick="goTo('upload')">
+        <div class="ni-icon"><div class="add-circle"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div></div>
+        <span class="ni-lbl">Add</span>
+      </div>
+      <div class="ni" id="nav-profile" onclick="goTo('profile')">
+        <div class="ni-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <span class="ni-lbl">Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="screen" id="upload">
+    <div class="hdr">
+      <div class="ibtn" onclick="goTo('home')"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="hlogo" style="font-size:20px"><span class="R">R</span>e<span class="D">D</span>ora</div>
+      <div style="width:36px"></div>
+    </div>
+    <div class="ubody">
+      <div class="utitle">New Memory</div>
+      <div class="uzone" id="uzone">
+        <input type="file" accept="image/*" id="fileIn" onchange="handleFile(event)">
+        <div class="uzone-ico">◻</div>
+        <div class="uzone-hint">Choose photo</div>
+      </div>
+      <div>
+        <label class="ulabel">Caption</label>
+        <textarea class="ucap" id="capIn" placeholder="Write something..."></textarea>
+      </div>
+      <div class="dind" id="dind"><div class="ddot"></div><span id="dindlbl">Saving to Drive</span></div>
+      <div class="pbar" id="pbar"><div class="pfill" id="pfill"></div></div>
+      <button class="bshare" id="shareBtn" onclick="submitPost()" disabled>
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Share Memory
+      </button>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="screen" id="profile" style="overflow-y:auto;padding-bottom:80px">
+    <div class="hdr">
+      <div class="ibtn" onclick="goTo('home')"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="hlogo" style="font-size:20px" id="phdrname">Profile</div>
+      <div class="ibtn" onclick="openEdit()"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+    </div>
+    <div class="prow">
+      <div class="pavw" onclick="pickAvatar()">
+        <div class="pava" id="pava">◻</div>
+        <div class="av-ed">✎</div>
+        <input type="file" accept="image/*" id="avatarIn" style="display:none" onchange="handleAvatar(event)">
+      </div>
+      <div class="pinf">
+        <div class="pname" id="pname">Your Name</div>
+        <div class="pcount" id="pcnt">0 memories</div>
+        <div class="pdlbl" id="pdlbl"><span>No drive connected</span></div>
+      </div>
+    </div>
+    <div class="pbio" id="pbio">—</div>
+    <button class="pedit" onclick="openEdit()">Edit Profile</button>
+    <div class="gtabs"><div class="gtab active"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div></div>
+    <div class="pgrid" id="pgrid"></div>
+    <div class="empty" id="pempty" style="display:none"><div class="eicon">◻</div><div class="etitle">No photos yet</div></div>
+  </div>
+
+  <!-- EDIT MODAL -->
+  <div class="mover" id="editM">
+    <div class="modal">
+      <button class="mclose" onclick="closeM('editM')">✕</button>
+      <div class="mtitle">Edit Profile</div>
+      <div class="mdesc">Update your name and bio</div>
+      <label class="flabel">Name</label>
+      <input class="minput" id="eName" placeholder="Your name">
+      <label class="flabel">Bio</label>
+      <textarea class="minput" id="eBio" style="min-height:65px;resize:none" placeholder="Something about you..."></textarea>
+      <button class="mbtn" onclick="saveProfile()">Save</button>
+    </div>
+  </div>
+
+  <!-- POST MODAL -->
+  <div class="mover" id="postModal" onclick="closeM('postModal')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="mclose" onclick="closeM('postModal')">✕</button>
+      <img class="mimg" id="mimg" src="" alt="">
+      <div class="mcap">
+        <div class="mcname" id="mname"></div>
+        <div class="mctxt" id="mcap"></div>
+        <div class="mcdate" id="mdate"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE MODAL -->
+  <div class="mover" id="delModal">
+    <div class="modal">
+      <button class="mclose" onclick="closeM('delModal')">✕</button>
+      <div class="mtitle">Delete Memory?</div>
+      <div class="mdesc">This will permanently remove it from Drive.</div>
+      <button class="bdel" onclick="confirmDel()">Delete</button>
+      <button class="bcan" onclick="closeM('delModal')">Cancel</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="lover" id="lover"><div class="lspin"></div><div class="ltxt" id="ltxt">Syncing</div></div>
+</div>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbya1Q3KvdjtYNTxWtA3rgXJqcf6nzLkX6C70yRdV0viSt7D7pz07Jw2C0seCMwVXUDI/exec";
+
+function driveImg(src){
+  if(!src) return '';
+  if(src.startsWith('data:')) return src;
+  let id = null;
+  const m1 = src.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  const m2 = src.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  const m3 = src.match(/^([a-zA-Z0-9_-]{25,})$/);
+  if(m1) id = m1[1];
+  else if(m2) id = m2[1];
+  else if(m3) id = m3[1];
+  if(id) return 'https://drive.google.com/thumbnail?id='+id+'&sz=w800';
+  return src;
+}
+
+const S = {
+  posts:   JSON.parse(localStorage.getItem('rd2_posts')   || '[]'),
+  profile: JSON.parse(localStorage.getItem('rd2_profile') || JSON.stringify({name:'Your Name',bio:'',photo:null})),
+  drive:   JSON.parse(localStorage.getItem('rd2_drive')   || 'null'),
+  pendImg: null,
+  pendDel: null,
+};
+const save = () => {
+  localStorage.setItem('rd2_posts',   JSON.stringify(S.posts));
+  localStorage.setItem('rd2_profile', JSON.stringify(S.profile));
+  localStorage.setItem('rd2_drive',   JSON.stringify(S.drive));
+};
+
+// SPLASH
+window.addEventListener('load', () => setTimeout(() => { goSc('connect'); showConnect(); }, 2000));
+
+// NAV
+function goSc(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function goTo(id){
+  goSc(id);
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  const n=document.getElementById('nav-'+id); if(n) n.classList.add('active');
+  if(id==='home'){ renderFeed(); syncDrive(); }
+  if(id==='profile') renderProfile();
+}
+
+// CONNECT
+function showConnect(){
+  if(S.drive && S.drive.ok){
+    document.getElementById('cdone').style.display='block';
+    document.getElementById('cnew').style.display='none';
+    document.getElementById('clabel').textContent=(S.drive.name||'Drive')+' — connected';
+  } else {
+    document.getElementById('cdone').style.display='none';
+    document.getElementById('cnew').style.display='block';
+    if(S.profile.name && S.profile.name!=='Your Name')
+      document.getElementById('nameIn').value=S.profile.name;
+  }
+}
+async function connectDrive(){
+  const name=(document.getElementById('nameIn').value.trim())||'Me';
+  const btn=document.querySelector('#cnew .btn-p');
+  btn.textContent='Connecting...'; btn.disabled=true;
+  try{
+    const res=await fetch(SCRIPT_URL);
+    const data=await res.json();
+    S.drive={scriptUrl:SCRIPT_URL,name,ok:true};
+    S.profile.name=name;
+    if(data.posts && data.posts.length) S.posts=data.posts;
+    save(); showToast('Connected to Drive');
+    setTimeout(()=>goTo('home'),600);
+  } catch(e){
+    showToast('Could not connect — check your URL');
+    btn.textContent='Start ReDora'; btn.disabled=false;
+  }
+}
+function skipConnect(){
+  S.drive={scriptUrl:SCRIPT_URL,name:S.profile.name||'Me',ok:true};
+  save(); goTo('home');
+}
+function disconnectDrive(){ S.drive=null; save(); showConnect(); showToast('Disconnected'); }
+
+// SYNC
+async function syncDrive(){
+  try{
+    const r=await fetch(SCRIPT_URL);
+    const d=await r.json();
+    if(d.posts){ S.posts=d.posts; save(); renderFeed(); }
+  } catch(e){}
+}
+async function refreshFromDrive(){ showLoad('Syncing...'); await syncDrive(); hideLoad(); showToast('Synced'); }
+
+// FEED
+function renderFeed(){
+  const pc=document.getElementById('posts'), ef=document.getElementById('efeed');
+  const sb=document.getElementById('sbar');
+  sb.querySelectorAll('.dstory').forEach(s=>s.remove());
+  if(!S.posts.length){ ef.style.display='flex'; pc.innerHTML=''; return; }
+  ef.style.display='none';
+  [...S.posts].slice(0,6).forEach(p=>{
+    const el=document.createElement('div');
+    el.className='si dstory';
+    el.innerHTML=`<div class="sr"><img src="${driveImg(p.img)}" alt=""></div><span class="slbl">${ago(p.ts)}</span>`;
+    el.onclick=()=>openPost(p.id); sb.appendChild(el);
+  });
+  pc.innerHTML=[...S.posts].sort((a,b)=>b.ts-a.ts).map((p,i)=>`
+    <div class="post" style="animation-delay:${i*.04}s">
+      <div class="ph">
+        <div class="pav">${S.profile.photo?`<img src="${S.profile.photo}" alt="">`:'◻'}</div>
+        <div><div class="puser">${esc(S.profile.name)}</div><div class="ptime">${ago(p.ts)}</div></div>
+        <div class="pmore" onclick="askDel(${p.id})">···</div>
+      </div>
+      <div class="pimg" onclick="openPost(${p.id})"><img src="${driveImg(p.img)}" alt="" loading="lazy"></div>
+      <div class="pacts">
+        <button class="abtn ${p.liked?'liked':''}" onclick="like(${p.id},this)">
+          <svg width="17" height="17" fill="${p.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span>${p.likes||0}</span>
+        </button>
+        <button class="abtn" onclick="openPost(${p.id})">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+      ${p.caption?`<div class="pcap"><b>${esc(S.profile.name)}</b> ${esc(p.caption)}</div>`:''}
+      <div class="pdate">${fmt(p.ts)}</div>
+    </div>`).join('');
+}
+
+function like(id,btn){
+  const p=S.posts.find(x=>x.id==id); if(!p) return;
+  p.liked=!p.liked; p.likes=(p.likes||0)+(p.liked?1:-1); save();
+  btn.classList.toggle('liked',p.liked);
+  btn.querySelector('svg').setAttribute('fill',p.liked?'currentColor':'none');
+  btn.querySelector('span').textContent=p.likes;
+}
+function askDel(id){ S.pendDel=id; openM('delModal'); }
+async function confirmDel(){
+  const id=S.pendDel; closeM('delModal'); showLoad('Deleting...');
+  try{ await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'deletePost',id:String(id)})}); } catch(e){}
+  S.posts=S.posts.filter(p=>p.id!=id); save(); hideLoad(); renderFeed(); showToast('Deleted');
+}
+
+// UPLOAD
+function handleFile(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    S.pendImg=ev.target.result;
+    const z=document.getElementById('uzone');
+    z.classList.add('has-img');
+    z.innerHTML=`<img src="${ev.target.result}" alt=""><button class="uchg" onclick="resetUp(event)">Change</button>`;
+    document.getElementById('shareBtn').disabled=false;
+    if(S.drive){ document.getElementById('dind').classList.add('show'); document.getElementById('dindlbl').textContent='Will sync to Drive · '+(S.drive.name||''); }
+  };
+  r.readAsDataURL(f);
+}
+function resetUp(e){ e&&e.stopPropagation(); S.pendImg=null;
+  const z=document.getElementById('uzone'); z.classList.remove('has-img');
+  z.innerHTML=`<input type="file" accept="image/*" id="fileIn" onchange="handleFile(event)"><div class="uzone-ico">◻</div><div class="uzone-hint">Choose photo</div>`;
+  document.getElementById('shareBtn').disabled=true; document.getElementById('dind').classList.remove('show');
+}
+async function submitPost(){
+  if(!S.pendImg) return;
+  const cap=document.getElementById('capIn').value.trim();
+  const btn=document.getElementById('shareBtn'), pb=document.getElementById('pbar'), pf=document.getElementById('pfill');
+  btn.disabled=true; btn.textContent='Saving...'; pb.classList.add('show');
+  let prog=0; const iv=setInterval(()=>{ prog+=Math.random()*18; if(prog>=88){prog=88;clearInterval(iv);} pf.style.width=prog+'%'; },200);
+  try{
+    const res=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'uploadPhoto',image:S.pendImg,mimeType:'image/jpeg',fileName:'memory_'+Date.now()+'.jpg',caption:cap,userName:S.profile.name||'Me'})});
+    const d=await res.json();
+    clearInterval(iv); pf.style.width='100%';
+    if(d.success && d.post){ S.posts.unshift(d.post); save(); showToast('Saved to Drive'); }
+    else throw new Error(d.error);
+  } catch(err){
+    clearInterval(iv); pf.style.width='100%';
+    S.posts.unshift({id:Date.now(),img:S.pendImg,caption:cap,ts:Date.now(),liked:false,likes:0}); save(); showToast('Saved locally');
+  }
+  await new Promise(r=>setTimeout(r,350)); pb.classList.remove('show'); pf.style.width='0%';
+  resetUp(); document.getElementById('capIn').value='';
+  btn.disabled=false; btn.innerHTML=`<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Share Memory`;
+  setTimeout(()=>goTo('home'),400);
+}
+
+// PROFILE
+function renderProfile(){
+  const p=S.profile;
+  document.getElementById('pname').textContent=p.name||'Your Name';
+  document.getElementById('phdrname').textContent=p.name||'Profile';
+  document.getElementById('pbio').textContent=p.bio||'—';
+  document.getElementById('pcnt').textContent=S.posts.length+' memor'+(S.posts.length===1?'y':'ies');
+  const dl=document.getElementById('pdlbl');
+  dl.innerHTML=S.drive&&S.drive.ok?`<div class="pddot"></div> Drive connected · ${S.drive.name||''}`:'No drive connected';
+  const av=document.getElementById('pava');
+  av.innerHTML=p.photo?`<img src="${p.photo}" alt="">`:'◻';
+  const gr=document.getElementById('pgrid'), pe=document.getElementById('pempty');
+  if(!S.posts.length){ gr.innerHTML=''; pe.style.display='flex'; return; }
+  pe.style.display='none';
+  gr.innerHTML=[...S.posts].sort((a,b)=>b.ts-a.ts).map(p=>`
+    <div class="gitem" onclick="openPost(${p.id})">
+      <img src="${driveImg(p.img)}" alt="" loading="lazy">
+      <div class="gov"><svg width="18" height="18" fill="none" stroke="white" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+    </div>`).join('');
+}
+function pickAvatar(){ document.getElementById('avatarIn').click(); }
+function handleAvatar(e){ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ S.profile.photo=ev.target.result; save(); renderProfile(); showToast('Photo updated'); }; r.readAsDataURL(f); }
+function openEdit(){ document.getElementById('eName').value=S.profile.name||''; document.getElementById('eBio').value=S.profile.bio||''; openM('editM'); }
+function saveProfile(){ const n=document.getElementById('eName').value.trim(); if(!n){showToast('Name required');return;} S.profile.name=n; S.profile.bio=document.getElementById('eBio').value.trim(); save(); renderProfile(); closeM('editM'); showToast('Profile updated'); }
+
+// POST MODAL
+function openPost(id){ const p=S.posts.find(x=>x.id==id); if(!p) return; document.getElementById('mimg').src=driveImg(p.img); document.getElementById('mname').textContent=S.profile.name; document.getElementById('mcap').textContent=p.caption||''; document.getElementById('mdate').textContent=fmt(p.ts); openM('postModal'); }
+
+// UTILS
+function openM(id){ document.getElementById(id).classList.add('show'); }
+function closeM(id){ document.getElementById(id).classList.remove('show'); }
+function showLoad(t){ document.getElementById('ltxt').textContent=t||'Loading'; document.getElementById('lover').classList.add('show'); }
+function hideLoad(){ document.getElementById('lover').classList.remove('show'); }
+let _tt; function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),2400); }
+function fmt(ts){ return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function ago(ts){ const d=Date.now()-ts; if(d<60000)return'just now'; if(d<3600000)return Math.floor(d/60000)+'m ago'; if(d<86400000)return Math.floor(d/3600000)+'h ago'; return Math.floor(d/86400000)+'d ago'; }
+function esc(s){ return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
