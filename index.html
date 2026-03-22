@@ -407,6 +407,8 @@ async function handleToken(resp){
     save(); hideLoad(); showConnect();
     showToast('Connected as ' + S.profile.name);
     setTimeout(() => goTo('home'), 700);
+    // auto silent refresh token before it expires (Google tokens last 1 hour)
+    setTimeout(()=>tokenClient&&tokenClient.requestAccessToken({prompt:''}), 55*60*1000);
   } catch(e){
     hideLoad(); showToast('Could not connect — check your Client ID');
   }
@@ -486,36 +488,53 @@ async function deleteFromDrive(id){
   });
 }
 
-const imgCache={};
-function driveImg(src){
-  if(!src) return '';
-  if(src.startsWith('data:')||src.startsWith('blob:')) return src;
-  if(imgCache[src]) return imgCache[src];
-  return '';
+// ── IMAGE UTILS ──────────────────────────────────────────────────────────────
+function driveImg(src){ return (src&&(src.startsWith('data:')||src.startsWith('blob:')))?src:''; }
+
+// Compress image to max 900px wide, ~80% quality — keeps localStorage usage low
+function compressImg(base64,cb){
+  const img=new Image();
+  img.onload=()=>{
+    const MAX=900;
+    let w=img.width,h=img.height;
+    if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    cb(c.toDataURL('image/jpeg',0.80));
+  };
+  img.src=base64;
 }
-async function getDriveImg(fileId){
-  if(!accessToken||!fileId) return '';
-  if(imgCache[fileId]) return imgCache[fileId];
+
+// Fetch a Drive file as base64 using current access token
+async function fetchDriveFileAsBase64(fileId){
+  if(!accessToken) return null;
   try{
     const r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
       {headers:{Authorization:'Bearer '+accessToken}});
-    if(!r.ok) return '';
+    if(!r.ok) return null;
     const blob=await r.blob();
-    imgCache[fileId]=URL.createObjectURL(blob);
-    return imgCache[fileId];
-  } catch(e){ return ''; }
+    return new Promise(res=>{
+      const fr=new FileReader();
+      fr.onload=e=>res(e.target.result);
+      fr.readAsDataURL(blob);
+    });
+  }catch(e){return null;}
 }
-async function loadDriveImages(){
+
+// After sync: fetch any posts that only have a Drive ID and store their base64
+async function hydrateImages(){
   if(!accessToken) return;
+  let changed=false;
   for(const p of S.posts){
-    if(!p.img||(p.img.startsWith('data:')||p.img.startsWith('blob:'))) continue;
-    if(imgCache[p.img]) continue;
-    const url=await getDriveImg(p.img);
-    if(!url) continue;
-    document.querySelectorAll('[data-pid="'+p.id+'"] img').forEach(el=>el.src=url);
-    const pav=document.getElementById('pav-'+p.id);
-    if(pav) pav.src=url;
+    if(!p.img||p.img.startsWith('data:')) continue; // already has base64
+    const b64=await fetchDriveFileAsBase64(p.img);
+    if(!b64) continue;
+    await new Promise(res=>compressImg(b64,compressed=>{p.img=compressed;res();}));
+    changed=true;
+    // update DOM live as each image loads
+    document.querySelectorAll('[data-pid="'+p.id+'"] img').forEach(el=>el.src=p.img);
   }
+  if(changed) save();
 }
 
 // ── SPLASH + CONNECT ──────────────────────────────────────────────────────────
@@ -545,7 +564,7 @@ function goTo(id){
   goSc(id);
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const n=document.getElementById('nav-'+id); if(n) n.classList.add('active');
-  if(id==='home'){ renderFeed(); loadDriveImages(); if(accessToken) syncDrive(); }
+  if(id==='home'){ renderFeed(); if(accessToken) syncDrive(); else renderFeed(); }
   if(id==='profile') renderProfile();
 }
 
@@ -554,16 +573,25 @@ async function syncDrive(){
   if(!accessToken) return;
   try{
     const data = await listFromDrive(); if(!data||!data.files) return;
-    const liked={};
-    S.posts.forEach(p=>{ if(p.liked) liked[p.id]={liked:true,likes:p.likes||0}; });
-    S.posts = data.files.map(f=>({
-      id:f.id, img:f.id, caption:f.description||'',
-      ts:new Date(f.createdTime).getTime(),
-      liked:!!(liked[f.id]&&liked[f.id].liked),
-      likes:liked[f.id]?liked[f.id].likes:0,
-      isDrive:true
-    }));
-    save(); renderFeed(); loadDriveImages();
+    // build lookup of existing posts so we can preserve their base64 images
+    const existing={};
+    S.posts.forEach(p=>existing[p.id]=p);
+    S.posts = data.files.map(f=>{
+      const prev=existing[f.id]||{};
+      return {
+        id:f.id,
+        img: (prev.img && prev.img.startsWith('data:')) ? prev.img : f.id,
+        driveId:f.id,
+        caption:f.description||'',
+        ts:new Date(f.createdTime).getTime(),
+        liked:!!prev.liked,
+        likes:prev.likes||0,
+        isDrive:true
+      };
+    });
+    save(); renderFeed();
+    // hydrate any posts that still only have a Drive ID (new posts without cached base64)
+    await hydrateImages();
   } catch(e){}
 }
 
@@ -648,18 +676,27 @@ async function submitPost(){
       const file = await uploadToDrive(S.pendImg, cap);
       clearInterval(iv); pf.style.width='100%';
       if(file && file.id){
-        imgCache[file.id]=S.pendImg;
-        S.posts.unshift({id:file.id, img:file.id, caption:cap, ts:Date.now(), liked:false, likes:0, isDrive:true});
+        // compress then store base64 directly so image persists without token
+        await new Promise(res=>compressImg(S.pendImg,compressed=>{
+          S.posts.unshift({id:file.id, img:compressed, driveId:file.id, caption:cap, ts:Date.now(), liked:false, likes:0, isDrive:true});
+          res();
+        }));
         save(); showToast('Saved to your Drive');
       }
     } else {
       clearInterval(iv); pf.style.width='100%';
-      S.posts.unshift({id:Date.now(), img:S.pendImg, caption:cap, ts:Date.now(), liked:false, likes:0});
+      await new Promise(res=>compressImg(S.pendImg,compressed=>{
+        S.posts.unshift({id:Date.now(), img:compressed, caption:cap, ts:Date.now(), liked:false, likes:0});
+        res();
+      }));
       save(); showToast('Saved locally');
     }
   } catch(err){
     clearInterval(iv); pf.style.width='100%';
-    S.posts.unshift({id:Date.now(), img:S.pendImg, caption:cap, ts:Date.now(), liked:false, likes:0});
+    await new Promise(res=>compressImg(S.pendImg,compressed=>{
+      S.posts.unshift({id:Date.now(), img:compressed, caption:cap, ts:Date.now(), liked:false, likes:0});
+      res();
+    }));
     save(); showToast('Saved locally');
   }
   await new Promise(r=>setTimeout(r,350)); pb.classList.remove('show'); pf.style.width='0%';
